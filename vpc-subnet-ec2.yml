@@ -1,0 +1,183 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: TestCfnTemplate
+Resources:
+  # VPC
+  testVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 20.0.0.0/16
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: CFN_TEST_VPC
+  # subnet
+  testPrivateSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: us-west-1a
+      VpcId: !Ref testVPC
+      CidrBlock: 20.0.1.0/24
+      Tags:
+        - Key: Name
+          Value: CFN_TEST_PRIVATE_SUBNET
+  # subnet
+  testPublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: us-west-1a
+      VpcId: !Ref testVPC
+      CidrBlock: 20.0.2.0/24
+      Tags:
+        - Key: Name
+          Value: CFN_TEST_PUBLIC_SUBNET
+  # security group
+  testSecGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: testSG_1
+      GroupDescription: testSG_1
+      VpcId: !Ref testVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: CFN_TEST_SG
+  # networkACL
+  testNetworkAclPublic:
+    Type: AWS::EC2::NetworkAcl
+    Properties:
+      VpcId: !Ref testVPC
+      Tags:
+        - Key: Name
+          Value: CFN_TEST_NETWORK_ACL_PUBLIC
+  testNetworkAclPrivate:
+    Type: AWS::EC2::NetworkAcl
+    Properties:
+      VpcId: !Ref testVPC
+      Tags:
+        - Key: Name
+          Value: CFN_TEST_NETWORK_ACL_PRIVATE
+  # relate with networkACL and subnet
+  testNetworkAssocPublic:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref testNetworkAclPublic
+      SubnetId: !Ref testPublicSubnet
+  testNetworkAssocPrivate:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      NetworkAclId: !Ref testNetworkAclPrivate
+      SubnetId: !Ref testPrivateSubnet
+  # accept all inbound rules(public subnet)
+  testACLInRulepublic:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      Egress: false
+      RuleNumber: 100
+      RuleAction: allow
+      Protocol: -1
+      CidrBlock: 0.0.0.0/0
+      NetworkAclId: !Ref testNetworkAclPublic
+  # accept all outbound rules(public subnet)
+  testAclOutRulePublic:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      Egress: true
+      RuleNumber: 100
+      RuleAction: allow
+      Protocol: -1
+      CidrBlock: 0.0.0.0/0
+      NetworkAclId: !Ref testNetworkAclPublic
+  # accept all inbound rules(private subnet)
+  testACLInRulePrivate:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      Egress: false
+      RuleNumber: 100
+      RuleAction: allow
+      Protocol: -1
+      CidrBlock: 0.0.0.0/0
+      NetworkAclId: !Ref testNetworkAclPrivate
+  # accept all outbound rules(private subnet)
+  testAclOutRulePrivate:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      Egress: true
+      RuleNumber: 100
+      RuleAction: allow
+      Protocol: -1
+      CidrBlock: 0.0.0.0/0
+      NetworkAclId: !Ref testNetworkAclPrivate
+  # route table
+  testRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref testVPC
+      Tags:
+        - Key: Name
+          Value: CFN_TEST_ROUTETABLE
+  # setting routes of route table
+  testRouteSetting:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref testRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref testIGW
+  # relate with route table and public subnet
+  testRouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref testPublicSubnet
+      RouteTableId: !Ref testRouteTable
+  # internet gateway
+  testIGW:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: CFN_TEST_IGW
+  # relate with internet gateway and vpc
+  testAttachIGW:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref testVPC
+      InternetGatewayId: !Ref testIGW
+  # instance(public)
+  testEC2InstancePublic:
+    Type: AWS::EC2::Instance
+    Properties:
+      KeyName: testkeypair
+      DisableApiTermination: false
+      ImageId: ami-018d291ca9ffc002f
+      InstanceType: t2.micro
+      Monitoring: false
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: "0"
+          SubnetId: !Ref testPublicSubnet
+          GroupSet:
+            - !Ref testSecGroup
+      Tags:
+        - Key: Name
+          Value: CFN_TEST_PUBLIC_INSTANCE
+  # instance(private)
+  testEC2InstancePrivate:
+    Type: AWS::EC2::Instance
+    Properties:
+      KeyName: testkeypair
+      DisableApiTermination: false
+      ImageId: ami-018d291ca9ffc002f
+      InstanceType: t2.micro
+      Monitoring: false
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: false
+          DeviceIndex: "0"
+          SubnetId: !Ref testPrivateSubnet
+          GroupSet:
+            - !Ref testSecGroup
+      Tags:
+        - Key: Name
+          Value: CFN_TEST_PRIVATE_INSTANCE
